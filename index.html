@@ -1,65 +1,461 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="utf-8" />
-  <title>Swagger UI — Caballeros</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="stylesheet"
-        href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css" />
+  <meta charset="UTF-8" />
+  <title>Swagger - Caballeros del Zodiaco</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist/swagger-ui.css" />
   <style>
-    body { margin:0; }
-    .topbar { display:none; }
+    body {
+      margin: 0;
+      padding: 0;
+      background: #0b1220;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #e5e7eb;
+    }
+    .topbar {
+      display: none; /* ocultar barra azul por defecto */
+    }
+    #swagger-ui {
+      max-width: 1200px;
+      margin: 24px auto;
+      background: #020617;
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.35);
+    }
+    .header-title {
+      text-align: center;
+      margin-bottom: 16px;
+    }
+    .header-title h1 {
+      margin: 0;
+      font-size: 1.8rem;
+      color: #38bdf8;
+    }
+    .header-title p {
+      margin: 8px 0 0;
+      color: #9ca3af;
+      font-size: 0.95rem;
+    }
+    .info-panel {
+      margin: 0 auto 24px;
+      max-width: 900px;
+      border-radius: 12px;
+      padding: 16px 20px;
+      background: linear-gradient(135deg, #0f172a, #030712);
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      font-size: 0.9rem;
+      line-height: 1.4;
+    }
+    .info-panel code {
+      background: #020617;
+      padding: 2px 4px;
+      border-radius: 4px;
+      font-size: 0.85rem;
+    }
   </style>
 </head>
 <body>
-  <h1 style="padding:10px;font-family:sans-serif;">
-    Swagger Caballeros – Prueba
-  </h1>
+  <div class="header-title">
+    <h1>API Caballeros del Zodiaco</h1>
+    <p>Microservicios de consulta e inserción de personajes desplegados en Render</p>
+  </div>
 
-  <div id="swagger"></div>
+  <div class="info-panel">
+    <p>
+      Esta documentación prueba contra el host:
+      <code>https://caballeroszodiaco-1.onrender.com</code>.
+    </p>
+    <p>
+      Endpoints principales:
+      <br>- <code>GET /health</code>: Estado de la base de datos.
+      <br>- <code>GET /personajes</code>: Lista o búsqueda de personajes.
+      <br>- <code>GET /personajes/{id}</code>: Detalle por ID.
+      <br>- <code>POST /personajes</code>: Inserta un nuevo personaje.
+    </p>
+    <p>
+      Si tu microservicio se despliega en otra URL, edita el valor de <code>servers[0].url</code> en el script de abajo.
+    </p>
+  </div>
 
-  <!-- Librería de Swagger UI -->
-  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+  <div id="swagger-ui"></div>
 
+  <script src="https://unpkg.com/swagger-ui-dist/swagger-ui-bundle.js"></script>
+  <script src="https://unpkg.com/swagger-ui-dist/swagger-ui-standalone-preset.js"></script>
   <script>
-    console.log("¿SwaggerUIBundle existe?", typeof SwaggerUIBundle);
-
-    const spec = {
+    // Especificación OpenAPI 3.0 para los microservicios de consulta e inserción
+    const openApiSpec = {
       openapi: "3.0.3",
       info: {
-        title: "Caballeros del Zodiaco API",
+        title: "Caballeros del Zodiaco - API",
         version: "1.0.0",
-        description: "Prueba mínima de Swagger UI en Render"
+        description: "API para consultar e insertar personajes de Caballeros del Zodiaco."
       },
       servers: [
         {
-          url: "https://consulta-caballeros.onrender.com",
-          description: "Consulta (Render)"
-        },
-        {
-          url: "http://localhost:4000",
-          description: "Consulta local"
+          url: "https://caballeroszodiaco-1.onrender.com",
+          description: "Render - Producción"
         }
       ],
       paths: {
         "/health": {
           get: {
-            summary: "Health",
+            tags: ["Sistema"],
+            summary: "Health check",
+            description: "Verifica la conexión a la base de datos y el conteo de registros en la tabla `personajes`.",
             responses: {
-              "200": { description: "OK" }
+              "200": {
+                description: "Conexión OK",
+                content: {
+                  "application/json": {
+                    schema: {
+                      $ref: "#/components/schemas/HealthResponse"
+                    }
+                  }
+                }
+              },
+              "500": {
+                description: "Error en la base de datos",
+                content: {
+                  "application/json": {
+                    schema: {
+                      $ref: "#/components/schemas/HealthResponse"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "/personajes": {
+          get: {
+            tags: ["Personajes - Consulta"],
+            summary: "Listar o buscar personajes",
+            description:
+              "Devuelve la lista de personajes, con filtros opcionales por `id`, `constelacion`, `nombre` (búsqueda por coincidencia parcial), y paginación por `limit`/`offset`.",
+            parameters: [
+              {
+                name: "id",
+                in: "query",
+                description: "ID del personaje (alternativo a /personajes/{id})",
+                schema: {
+                  type: "integer",
+                  minimum: 1
+                }
+              },
+              {
+                name: "constelacion",
+                in: "query",
+                description: "Constelación exacta del personaje (por ejemplo: 'Pegaso')",
+                schema: {
+                  type: "string"
+                }
+              },
+              {
+                name: "nombre",
+                in: "query",
+                description: "Coincidencia parcial por nombre (no sensible a mayúsculas/minúsculas)",
+                schema: {
+                  type: "string"
+                }
+              },
+              {
+                name: "limit",
+                in: "query",
+                description: "Máximo número de registros a devolver (1-200). Por defecto 50.",
+                schema: {
+                  type: "integer",
+                  default: 50,
+                  minimum: 1,
+                  maximum: 200
+                }
+              },
+              {
+                name: "offset",
+                in: "query",
+                description: "Número de registros a saltar (para paginación). Por defecto 0.",
+                schema: {
+                  type: "integer",
+                  default: 0,
+                  minimum: 0
+                }
+              }
+            ],
+            responses: {
+              "200": {
+                description: "Listado de personajes",
+                content: {
+                  "application/json": {
+                    schema: {
+                      $ref: "#/components/schemas/PersonajeListResponse"
+                    }
+                  }
+                }
+              },
+              "404": {
+                description: "No encontrado (cuando se busca por id y no existe)",
+                content: {
+                  "application/json": {
+                    schema: {
+                      $ref: "#/components/schemas/ErrorResponse"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          post: {
+            tags: ["Personajes - Inserción"],
+            summary: "Insertar un nuevo personaje",
+            description:
+              "Inserta un nuevo personaje en la base de datos. Campos requeridos: `nombre`, `constelacion`, `imagen_url`. Campos opcionales: `edad`, `altura_cm`.",
+            requestBody: {
+              required: true,
+              content: {
+                "application/json": {
+                  schema: {
+                    $ref: "#/components/schemas/PersonajeCreate"
+                  },
+                  example: {
+                    nombre: "Seiya",
+                    constelacion: "Pegaso",
+                    imagen_url: "https://mi-servidor.com/imagenes/seiya.jpg",
+                    edad: 15,
+                    altura_cm: 165
+                  }
+                }
+              }
+            },
+            responses: {
+              "201": {
+                description: "Personaje creado",
+                content: {
+                  "application/json": {
+                    schema: {
+                      type: "object",
+                      properties: {
+                        ok: { type: "boolean" },
+                        id: { type: "integer", description: "ID autogenerado del nuevo personaje" },
+                        message: { type: "string" }
+                      }
+                    },
+                    example: {
+                      ok: true,
+                      id: 42,
+                      message: "Personaje creado"
+                    }
+                  }
+                }
+              },
+              "400": {
+                description: "Error de validación",
+                content: {
+                  "application/json": {
+                    schema: { $ref: "#/components/schemas/ErrorResponse" },
+                    examples: {
+                      faltan_campos: {
+                        summary: "Nombre obligatorio",
+                        value: { ok: false, error: "nombre es obligatorio" }
+                      },
+                      url_invalida: {
+                        summary: "URL inválida",
+                        value: { ok: false, error: "imagen_url debe iniciar con http(s)://" }
+                      }
+                    }
+                  }
+                }
+              },
+              "409": {
+                description: "Nombre duplicado",
+                content: {
+                  "application/json": {
+                    schema: { $ref: "#/components/schemas/ErrorResponse" },
+                    example: { ok: false, error: "Nombre duplicado" }
+                  }
+                }
+              },
+              "500": {
+                description: "Error interno al insertar",
+                content: {
+                  "application/json": {
+                    schema: { $ref: "#/components/schemas/ErrorResponse" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "/personajes/{id}": {
+          get: {
+            tags: ["Personajes - Consulta"],
+            summary: "Obtener personaje por ID",
+            description:
+              "Devuelve el personaje con el ID indicado. Internamente tu microservicio devuelve un arreglo `data` con 0 o 1 elementos.",
+            parameters: [
+              {
+                name: "id",
+                in: "path",
+                required: true,
+                description: "ID del personaje",
+                schema: {
+                  type: "integer",
+                  minimum: 1
+                }
+              }
+            ],
+            responses: {
+              "200": {
+                description: "Personaje encontrado",
+                content: {
+                  "application/json": {
+                    schema: {
+                      $ref: "#/components/schemas/PersonajeListResponse"
+                    },
+                    example: {
+                      ok: true,
+                      count: 1,
+                      data: [
+                        {
+                          id: 1,
+                          nombre: "Seiya",
+                          edad: 15,
+                          altura_cm: 165,
+                          constelacion: "Pegaso",
+                          imagen_url: "https://mi-servidor.com/imagenes/seiya.jpg",
+                          created_at: "2025-11-14T13:45:00.000Z"
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              "404": {
+                description: "No existe un personaje con ese ID",
+                content: {
+                  "application/json": {
+                    schema: { $ref: "#/components/schemas/ErrorResponse" },
+                    example: { ok: false, error: "No encontrado" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      components: {
+        schemas: {
+          Personaje: {
+            type: "object",
+            properties: {
+              id: { type: "integer" },
+              nombre: { type: "string" },
+              edad: {
+                type: "integer",
+                nullable: true,
+                description: "Edad aproximada del personaje"
+              },
+              altura_cm: {
+                type: "number",
+                format: "float",
+                nullable: true,
+                description: "Altura en centímetros"
+              },
+              constelacion: { type: "string" },
+              imagen_url: {
+                type: "string",
+                format: "uri"
+              },
+              created_at: {
+                type: "string",
+                format: "date-time",
+                description: "Fecha de creación del registro"
+              }
+            }
+          },
+          PersonajeCreate: {
+            type: "object",
+            required: ["nombre", "constelacion", "imagen_url"],
+            properties: {
+              nombre: {
+                type: "string",
+                description: "Nombre del personaje"
+              },
+              constelacion: {
+                type: "string",
+                description: "Constelación del personaje"
+              },
+              imagen_url: {
+                type: "string",
+                format: "uri",
+                description: "URL de la imagen del personaje. Debe empezar por http:// o https://"
+              },
+              edad: {
+                type: "integer",
+                minimum: 10,
+                maximum: 100,
+                nullable: true,
+                description: "Edad aproximada del personaje (10-100 años)"
+              },
+              altura_cm: {
+                type: "number",
+                minimum: 120,
+                maximum: 230,
+                nullable: true,
+                description: "Altura en centímetros (120-230)"
+              }
+            }
+          },
+          PersonajeListResponse: {
+            type: "object",
+            properties: {
+              ok: { type: "boolean" },
+              count: {
+                type: "integer",
+                description: "Número de registros devueltos"
+              },
+              data: {
+                type: "array",
+                items: { $ref: "#/components/schemas/Personaje" }
+              }
+            }
+          },
+          HealthResponse: {
+            type: "object",
+            properties: {
+              ok: { type: "boolean" },
+              db: { type: "string", nullable: true },
+              table: { type: "string", nullable: true },
+              count: { type: "integer", nullable: true },
+              code: { type: "string", nullable: true },
+              errno: { type: "integer", nullable: true },
+              message: { type: "string", nullable: true }
+            }
+          },
+          ErrorResponse: {
+            type: "object",
+            properties: {
+              ok: { type: "boolean", example: false },
+              error: { type: "string" },
+              detail: {
+                type: "object",
+                nullable: true,
+                additionalProperties: true
+              }
             }
           }
         }
       }
     };
 
-    window.ui = SwaggerUIBundle({
-      spec,
-      dom_id: "#swagger",
-      docExpansion: "list",
-      deepLinking: true,
-      presets: [SwaggerUIBundle.presets.apis]
-    });
+    window.onload = function () {
+      SwaggerUIBundle({
+        spec: openApiSpec,
+        dom_id: "#swagger-ui",
+        deepLinking: true,
+        presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
+        layout: "BaseLayout"
+      });
+    };
   </script>
 </body>
 </html>
