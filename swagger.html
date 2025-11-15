@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>Swagger UI — Caballeros del Zodiaco</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet"
+        href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css" />
+  <style>
+    body { margin:0; }
+    .topbar { display:none; }
+  </style>
+</head>
+<body>
+  <div id="swagger"></div>
+
+  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+  <script>
+
+    // URL
+    const CONSULTA_BASE = "https://caballeroszodiaco.onrender.com";
+    const INSERCION_BASE = "https://caballeroszodiaco-1.onrender.com";
+
+    const spec = {
+      openapi: "3.0.3",
+      info: {
+        title: "Caballeros del Zodiaco API",
+        version: "1.0.0",
+        description:
+          "API separada en dos microservicios: uno para consulta (GET) y otro para inserción (POST).\n\n" +
+          "- Consulta: GET /health, GET /personajes, GET /personajes/{id}\n" +
+          "- Inserción: POST /personajes"
+      },
+      tags: [
+        { name: "Salud", description: "Healthcheck del microservicio de consulta" },
+        { name: "Personajes (consulta)", description: "Búsqueda y detalle de personajes" },
+        { name: "Personajes (inserción)", description: "Creación de nuevos personajes" }
+      ],
+      paths: {
+        "/health": {
+          get: {
+            tags: ["Salud"],
+            summary: "Health check del microservicio de consulta",
+            description: "Verifica que el servicio y la tabla personajes estén accesibles.",
+            servers: [
+              { url: CONSULTA_BASE, description: "Consulta (Render)" },
+              { url: LOCAL_CONSULTA, description: "Consulta local" }
+            ],
+            responses: {
+              200: {
+                description: "Servicio OK",
+                content: {
+                  "application/json": {
+                    schema: {
+                      type: "object",
+                      properties: {
+                        ok: { type: "boolean", example: true },
+                        db: { type: "string", example: "caballeros_zodiaco" },
+                        table: { type: "string", example: "personajes" },
+                        count: { type: "integer", example: 42 }
+                      }
+                    }
+                  }
+                }
+              },
+              500: {
+                description: "Error de conexión a BD",
+                content: {
+                  "application/json": {
+                    schema: {
+                      type: "object",
+                      properties: {
+                        ok: { type: "boolean", example: false },
+                        code: { type: "string", example: "ER_ACCESS_DENIED_ERROR" },
+                        errno: { type: "integer", example: 1045 },
+                        message: { type: "string", example: "Access denied for user ..." }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+
+        "/personajes": {
+          get: {
+            tags: ["Personajes (consulta)"],
+            summary: "Listar / filtrar personajes",
+            description:
+              "Consulta personajes con filtros opcionales por id, constelación, nombre y paginación (limit/offset). " +
+              "Usa el microservicio de consulta (ConsultaCaballerosZ.js).",
+            servers: [
+              { url: CONSULTA_BASE, description: "Consulta (Render)" },
+              { url: LOCAL_CONSULTA, description: "Consulta local" }
+            ],
+            parameters: [
+              {
+                name: "id",
+                in: "query",
+                required: false,
+                schema: { type: "integer", minimum: 1 },
+                description: "Filtrar por id exacto (opcional). Si se envía, se ignora limit/offset."
+              },
+              {
+                name: "constelacion",
+                in: "query",
+                required: false,
+                schema: { type: "string" },
+                description: "Filtra por constelación exacta (ej. Pegaso, Cisne)."
+              },
+              {
+                name: "nombre",
+                in: "query",
+                required: false,
+                schema: { type: "string" },
+                description: "Filtro LIKE por nombre (no sensible a mayúsculas)."
+              },
+              {
+                name: "limit",
+                in: "query",
+                required: false,
+                schema: { type: "integer", minimum: 1, maximum: 200, default: 50 },
+                description: "Máximo de registros a devolver (1–200). Por defecto 50."
+              },
+              {
+                name: "offset",
+                in: "query",
+                required: false,
+                schema: { type: "integer", minimum: 0, default: 0 },
+                description: "Desplazamiento para paginación. Por defecto 0."
+              }
+            ],
+            responses: {
+              200: {
+                description: "Listado de personajes",
+                content: {
+                  "application/json": {
+                    schema: {
+                      type: "object",
+                      properties: {
+                        ok: { type: "boolean", example: true },
+                        count: { type: "integer", example: 2 },
+                        data: {
+                          type: "array",
+                          items: { $ref: "#/components/schemas/Personaje" }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              404: {
+                description: "No encontrado (cuando se consulta por id y no hay registro)",
+                content: {
+                  "application/json": {
+                    schema: { $ref: "#/components/schemas/ErrorResponse" }
+                  }
+                }
+              },
+              500: {
+                description: "Error interno / BD",
+                content: {
+                  "application/json": {
+                    schema: { $ref: "#/components/schemas/ErrorResponse" }
+                  }
+                }
+              }
+            }
+          },
+
+          post: {
+            tags: ["Personajes (inserción)"],
+            summary: "Crear personaje",
+            description:
+              "Inserta un nuevo personaje en la tabla personajes usando el microservicio de inserción (InsercionCaballerosZ.js).",
+            servers: [
+              { url: INSERCION_BASE, description: "Inserción (Render)" },
+              { url: LOCAL_INSERCION, description: "Inserción local" }
+            ],
+            requestBody: {
+              required: true,
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/PersonajeCreate" },
+                  examples: {
+                    ejemplo: {
+                      value: {
+                        nombre: "Seiya",
+                        constelacion: "Pegaso",
+                        imagen_url: "https://mis-imagenes.com/seiya.png",
+                        edad: 13,
+                        altura_cm: 165
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            responses: {
+              201: {
+                description: "Personaje creado",
+                content: {
+                  "application/json": {
+                    schema: {
+                      type: "object",
+                      properties: {
+                        ok: { type: "boolean", example: true },
+                        id: { type: "integer", example: 101 },
+                        message: { type: "string", example: "Personaje creado" }
+                      }
+                    }
+                  }
+                }
+              },
+              400: {
+                description: "Error de validación (campos obligatorios o rangos inválidos)",
+                content: {
+                  "application/json": {
+                    schema: { $ref: "#/components/schemas/ErrorResponse" }
+                  }
+                }
+              },
+              409: {
+                description: "Nombre duplicado",
+                content: {
+                  "application/json": {
+                    schema: { $ref: "#/components/schemas/ErrorResponse" }
+                  }
+                }
+              },
+              500: {
+                description: "Error interno / BD",
+                content: {
+                  "application/json": {
+                    schema: { $ref: "#/components/schemas/ErrorResponse" }
+                  }
+                }
+              }
+            }
+          }
+        },
+
+        "/personajes/{id}": {
+          get: {
+            tags: ["Personajes (consulta)"],
+            summary: "Obtener personaje por id (vía path)",
+            description:
+              "Equivalente a GET /personajes?id={id}, pero con el id en el path. Usa el microservicio de consulta.",
+            servers: [
+              { url: CONSULTA_BASE, description: "Consulta (Render)" },
+              { url: LOCAL_CONSULTA, description: "Consulta local" }
+            ],
+            parameters: [
+              {
+                name: "id",
+                in: "path",
+                required: true,
+                schema: { type: "integer", minimum: 1 },
+                description: "Id del personaje."
+              }
+            ],
+            responses: {
+              200: {
+                description: "Personaje encontrado",
+                content: {
+                  "application/json": {
+                    schema: {
+                      type: "object",
+                      properties: {
+                        ok: { type: "boolean", example: true },
+                        count: { type: "integer", example: 1 },
+                        data: {
+                          type: "array",
+                          items: { $ref: "#/components/schemas/Personaje" }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              404: {
+                description: "No encontrado",
+                content: {
+                  "application/json": {
+                    schema: { $ref: "#/components/schemas/ErrorResponse" }
+                  }
+                }
+              },
+              500: {
+                description: "Error interno / BD",
+                content: {
+                  "application/json": {
+                    schema: { $ref: "#/components/schemas/ErrorResponse" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+
+      components: {
+        schemas: {
+          Personaje: {
+            type: "object",
+            properties: {
+              id: { type: "integer", example: 1 },
+              nombre: { type: "string", example: "Seiya" },
+              edad: { type: "integer", nullable: true, example: 13 },
+              altura_cm: { type: "number", nullable: true, example: 165 },
+              constelacion: { type: "string", example: "Pegaso" },
+              imagen_url: { type: "string", example: "https://mis-imagenes.com/seiya.png" },
+              created_at: {
+                type: "string",
+                format: "date-time",
+                example: "2025-10-31T15:04:05.000Z"
+              }
+            }
+          },
+          PersonajeCreate: {
+            type: "object",
+            required: ["nombre", "constelacion", "imagen_url"],
+            properties: {
+              nombre: {
+                type: "string",
+                description: "Nombre del personaje (obligatorio)."
+              },
+              constelacion: {
+                type: "string",
+                description: "Constelación del caballero (obligatoria)."
+              },
+              imagen_url: {
+                type: "string",
+                format: "uri",
+                description: "URL de la imagen. Debe iniciar con http:// o https://."
+              },
+              edad: {
+                type: "integer",
+                nullable: true,
+                minimum: 10,
+                maximum: 100,
+                description: "Edad opcional, rango [10,100]."
+              },
+              altura_cm: {
+                type: "number",
+                nullable: true,
+                minimum: 120,
+                maximum: 230,
+                description: "Altura opcional en cm, rango [120,230]."
+              }
+            }
+          },
+          ErrorResponse: {
+            type: "object",
+            properties: {
+              ok: { type: "boolean", example: false },
+              error: { type: "string", example: "Mensaje de error" },
+              detail: {
+                type: "object",
+                nullable: true,
+                description: "Detalles internos opcionales (códigos de BD, etc.)."
+              }
+            }
+          }
+        }
+      }
+    };
+
+    window.ui = SwaggerUIBundle({
+      spec,
+      dom_id: '#swagger',
+      docExpansion: 'list',
+      deepLinking: true,
+      presets: [SwaggerUIBundle.presets.apis],
+    });
+  </script>
+</body>
+</html>
