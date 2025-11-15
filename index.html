@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>Swagger UI — Caballeros</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet"
+        href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css" />
+  <style>
+    body { margin:0; }
+    .topbar { display:none; }
+  </style>
+</head>
+<body>
+  <h1 style="padding:10px;font-family:sans-serif;">
+    Swagger Caballeros – Prueba
+  </h1>
+
+  <div id="swagger"></div>
+
+  <!-- Librería de Swagger UI -->
+  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+
+  <script>
+    console.log("¿SwaggerUIBundle existe?", typeof SwaggerUIBundle);
+
+    const spec = {
+      openapi: "3.0.3",
+      info: {
+        title: "Caballeros del Zodiaco API",
+        version: "1.0.0",
+        description: "Prueba mínima de Swagger UI en Render"
+      },
+      servers: [
+        {
+          url: "https://consulta-caballeros.onrender.com",
+          description: "Consulta (Render)"
+        },
+        {
+          url: "http://localhost:4000",
+          description: "Consulta local"
+        }
+      ],
+      paths: {
+        "/health": {
+          get: {
+            summary: "Health",
+            responses: {
+              "200": { description: "OK" }
+            }
+          }
+        }
+      }
+    };
+
+    window.ui = SwaggerUIBundle({
+      spec,
+      dom_id: "#swagger",
+      docExpansion: "list",
+      deepLinking: true,
+      presets: [SwaggerUIBundle.presets.apis]
+    });
+  </script>
+</body>
+</html>
